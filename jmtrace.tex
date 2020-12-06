@@ -1,0 +1,84 @@
+\documentclass[UTF8]{article}
+
+\usepackage{ctex}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{algorithm}  
+\usepackage{algorithmicx}  
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{xcolor}
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+\lstset{frame=tb,
+     language=Java,
+     aboveskip=3mm,
+     belowskip=3mm,
+     showstringspaces=false,
+     columns=flexible,
+     basicstyle = \ttfamily\small,
+     numbers=none,
+     numberstyle=\tiny\color{gray},
+     keywordstyle=\color{blue},
+     commentstyle=\color{dkgreen},
+     stringstyle=\color{mauve},
+     breaklines=true,
+     breakatwhitespace=true,
+     tabsize=4
+}
+
+\geometry{a4paper,scale=0.8}
+
+\begin{document}
+
+\title{jmtrace 实验报告}
+
+\author{MG20330050 侍林天}
+
+\maketitle
+
+\section{代码插桩}
+Java字节码中对内存进行访问的指令有getstatic/putstatic/getfield/putfield/*aload/*astore。
+我们只需要考虑在遍历字节码时遇到这些指令的时候插入相应的输出代码即可。
+
+\subsection{涉及Field的内存访问操作}
+涉及到Field的内存访问操作有getstatic/putstatic/getfield/putfield。
+可以使用ASM包中MethodVisitor类里的void visitFieldInsn(int opcode, String owner, String name, String descriptor)在遍历到这些操作的时候进行插桩。
+
+\subsubsection{getstatic/putstatic}
+因为getstatic和putstatic读写的是静态成员，所以我们直接通过MethodVisitor的visitLdcInsn将域的所有者owner和域名name压入栈中，
+最后通过MethodVisitor的visitMethodInsn插入INVOKESTATIC调用输出函数staticGetLogPrint(staticPutLogPrint)。
+这里我们直接将持有该静态成员的类名的哈希值作为对象标识。
+\begin{lstlisting}[language=Java]
+    mv.visitLdcInsn(owner);
+    mv.visitLdcInsn(name);
+    mv.visitMethodInsn(Opcodes.INVOKESTATIC, "log/JMTraceLogPrinter", "staticGetLogPrint", "(Ljava/lang/String;Ljava/lang/String;)V", false);
+\end{lstlisting}
+
+\subsubsection{getfield}
+指令getfield时operand stack如下：
+\begin{equation*}
+    \begin{split}
+        &\ldots, objectref\ \rightarrow\\
+        &\ldots, val
+    \end{split}
+\end{equation*}
+
+我们需要将objectref和域名name作为参数传递给输出函数，因此首先通过MethodVisitor的visitInsn方法插入DUP指令，将栈顶的objectref复制一份，
+然后再用visitLdcInsn将域名name压入栈中。
+\begin{lstlisting}[language=Java]
+    mv.visitInsn(Opcodes.DUP);
+    mv.visitLdcInsn(name);
+    mv.visitMethodInsn(Opcodes.INVOKESTATIC, "log/JMTraceLogPrinter", "getLogPrint", "(Ljava/lang/Object;Ljava/lang/String;)V", false);
+\end{lstlisting}
+
+
+
+\section{ACKNOWLEDGE}
+https://docs.oracle.com/javase/specs/jvms/se11/html/jvms-6.html
+
+\end{document}
