@@ -40,6 +40,11 @@
 \author{MG20330050 侍林天}
 
 \maketitle
+\section{整体框架}
+jmtrace需要我们对一个java的程序在其进行内存访问操作的时候输出一些信息，因此我们需要修改一个已打包为jar包的Java程序，在其中插桩一些信息输出代码。
+
+首先我们使用了java中的instrument包对类定义动态改变和操作，定义了一个JMTraceTransformer类在JVM加载Java程序中的类时进行动态的更改。
+在JMTraceTransformer类中我们
 
 \section{代码插桩}
 Java字节码中对内存进行访问的指令有getstatic/putstatic/getfield/putfield/*aload/*astore。
