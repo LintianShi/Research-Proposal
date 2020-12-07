@@ -45,8 +45,9 @@ jmtrace需要我们对一个java的程序在其进行内存访问操作的时候
 
 首先我们使用了java中的instrument包对类定义动态改变和操作，定义了一个JMTraceTransformer类在JVM加载Java程序中的类时进行动态的更改。
 在JMTraceTransformer类中我们使用了org.objectweb.asm包帮助我们对jar包中的字节码进行遍历，并且感觉通过改写asm框架的函数在遍历到相应字节码时插入我们需要的字节码。
+因为java中的内存读写操作都集中在Method里，所以我们主要对asm框架的MethodVisitor进行修改。
 
-因为java中的内存读写操作都
+此外我们还写了一个JMTraceLogPrinter类，里面有一系列静态函数用于输出信息。
 
 \section{代码插桩}
 Java字节码中对内存进行访问的指令有getstatic/putstatic/getfield/putfield/*aload/*astore。
@@ -60,11 +61,11 @@ Java字节码中对内存进行访问的指令有getstatic/putstatic/getfield/pu
 因为getstatic和putstatic读写的是静态成员，所以我们直接通过MethodVisitor的visitLdcInsn将域的所有者owner和域名name压入栈中，
 最后通过MethodVisitor的visitMethodInsn插入INVOKESTATIC调用输出函数staticGetLogPrint(staticPutLogPrint)。
 这里我们直接将持有该静态成员的类名的哈希值作为对象标识。
-\begin{lstlisting}[language=Java]
-    mv.visitLdcInsn(owner);
-    mv.visitLdcInsn(name);
-    mv.visitMethodInsn(Opcodes.INVOKESTATIC, "log/JMTraceLogPrinter", "staticGetLogPrint", "(Ljava/lang/String;Ljava/lang/String;)V", false);
-\end{lstlisting}
+% \begin{lstlisting}[language=Java]
+%     mv.visitLdcInsn(owner);
+%     mv.visitLdcInsn(name);
+%     mv.visitMethodInsn(Opcodes.INVOKESTATIC, "log/JMTraceLogPrinter", "staticGetLogPrint", "(Ljava/lang/String;Ljava/lang/String;)V", false);
+% \end{lstlisting}
 
 \subsubsection{getfield}
 指令getfield时operand stack如下：
@@ -77,11 +78,25 @@ Java字节码中对内存进行访问的指令有getstatic/putstatic/getfield/pu
 
 我们需要将objectref和域名name作为参数传递给输出函数，因此首先通过MethodVisitor的visitInsn方法插入DUP指令，将栈顶的objectref复制一份，
 然后再用visitLdcInsn将域名name压入栈中。
-\begin{lstlisting}[language=Java]
-    mv.visitInsn(Opcodes.DUP);
-    mv.visitLdcInsn(name);
-    mv.visitMethodInsn(Opcodes.INVOKESTATIC, "log/JMTraceLogPrinter", "getLogPrint", "(Ljava/lang/Object;Ljava/lang/String;)V", false);
-\end{lstlisting}
+% \begin{lstlisting}[language=Java]
+%     mv.visitInsn(Opcodes.DUP);
+%     mv.visitLdcInsn(name);
+%     mv.visitMethodInsn(Opcodes.INVOKESTATIC, "log/JMTraceLogPrinter", "getLogPrint", "(Ljava/lang/Object;Ljava/lang/String;)V", false);
+% \end{lstlisting}
+
+\subsubsection{putfield}
+指令putfield和getfield不同的地方在于，执行putfield时的栈顶多了一个要写入的值val，如左边所示。
+我们无法直接在栈顶拿到object，因此我们需要做一些额外的操作，使得在调用输出函数前栈为右边那样。
+\begin{equation*}
+    \begin{split}
+        &\text{val}\ \rightarrow\qquad\ \  \text{objectref}\ \rightarrow\\
+        &\text{objectref}\qquad \text{val}\\
+        &\qquad\qquad\qquad\text{objectref}
+    \end{split}
+\end{equation*}
+
+如果val是一个单字节的数据如boolean, int, float等，我们只需要使用java字节码中的SWAP指令交换val和objectref，然后DUP复制栈顶的objectref作为函数参数，
+函数调用完毕之后再使用SWAP将val和\\objectref换回原来的位置恢复现场即可。但如果val是一个double或者long的数据那么则会麻烦得多
 
 
 
