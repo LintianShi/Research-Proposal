@@ -98,7 +98,12 @@ Java字节码中对内存进行访问的指令有getstatic/putstatic/getfield/pu
 接着用POP2将栈顶的val弹出，这样我们就完成了两字节的val和object的交换。
 然后我们使用DUP复制栈顶的objectref完成参数的准备。最后使用DUP\_X2将栈顶的objectref复制一份，插入两个字节后面，再POP掉栈顶的objectref，恢复现场。
 
+\subsection{涉及数组访问的操作}
+java字节中涉及数组的读写指令有*aload/*astore，分别用一个字母来代表数组的类型，比如aaload代表读一个元素为引用的数组。
+我们需要在visitInsn函数里对这一系列指令进行操作。
 
+\subsubsection{*aload}
+*aload
 
 \section{ACKNOWLEDGE}
 https://docs.oracle.com/javase/specs/jvms/se11/html/jvms-6.html
