@@ -8,6 +8,8 @@
 \usepackage{algorithm}  
 \usepackage{algorithmicx}  
 \usepackage{algpseudocode}
+\usepackage{graphicx}
+\usepackage{subfigure}
 \geometry{a4paper,scale=0.8}
 
 \begin{document}
@@ -32,6 +34,30 @@ Codesim需要我们做的工作简单来说就是给出两份代码之间的相�
 在本Codesim工具中，我们先使用Clang根据C++的语法规则将代码解析为一个抽象语法树（Abstract Syntax Tree）。
 抽象语法树是源代码语法结构的一种抽象表示，它以树状的形式表现编程语言的语法结构，树上的每个节点都表示源代码中的一种结构。
 并且在抽象语法树中会忽略实际代码中的许多细节，比如变量名、函数名等。对于代码相似度检查而言是一种良好的表示方式，
-既保留代码语法上的结构，同时忽略了不必要、甚至会干扰我们的细节。
+既保留代码语法上的结构，同时忽略了不必要、甚至会干扰我们的细节。一个需要注意的地方是，在预处理时我们需要忽略include的那些库函数的头文件，
+以免导致语法树中包含太多与用户代码无关的信息影响代码相似度的检查。
+
+在Clang生成完语法树后，我们使用类似于二叉树的前序遍历的方法遍历整个人语法树，得到一个节点的序列。
+每一个节点都对应了一个名称，于是我们把问题转换成了比较两个序列之间的相似度。
+
+\section{相似度检测算法}
+我们使用Greedy String Tiling算法来比较两个序列之间的相似度。GST算法是一种贪心算法，每轮优先将当前最长的两个子序列配对，
+然后在剩下的序列中再找出最长的子序列进行匹配，直到找不出满足最小匹配长度的子序列为止。
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.2]{gst.png}
+    \caption{GST算法}
+\end{figure}
+
+
+\newpage
+我们令$\textit{coverage}(tiles)$为所有配对的子序列的长度和，
+于是序列A和B的相似度为$sim(A,B) = \frac{2 \cdot \textit{coverage}}{\| A \| + \| B \|}$。
+我们用序列的相似度表示两份代码的相似度.
+
+\section{REFERENCE}
+Prechelt, Lutz, Guido Malpohl, and Michael Philippsen. "Finding plagiarisms among a set of programs with JPlag." J. UCS 8.11 (2002): 1016.
+
+Wise, Michael J. "String similarity via greedy string tiling and running Karp-Rabin matching." Online Preprint, Dec 119.1 (1993): 1-17.
 
 \end{document}

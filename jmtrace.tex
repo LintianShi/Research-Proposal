@@ -41,18 +41,18 @@ MG20330050 侍林天
 jmtrace需要我们对一个java的程序在其进行内存访问操作的时候输出一些信息，因此我们需要修改一个已打包为jar包的Java程序，在其中插桩一些信息输出代码。
 
 首先我们使用了java中的instrument包对类定义动态改变和操作，定义了一个JMTraceTransformer类在JVM加载Java程序中的类时进行动态的更改。
-在JMTraceTransformer类中我们使用了org.objectweb.asm包帮助我们对jar包中的字节码进行遍历，并且感觉通过改写asm框架的函数在遍历到相应字节码时插入我们需要的字节码。
+在JMTraceTransformer类中我们使用了org.objectweb.asm包帮助我们对jar包中的字节码进行遍历，并且通过改写asm框架的函数，在遍历到相应字节码时插入我们需要的字节码。
 因为java中的内存读写操作都集中在Method里，所以我们主要对asm框架的MethodVisitor进行修改。
 
-此外我们还写了一个JMTraceLogPrinter类，里面有一系列静态函数用于输出信息。
+此外我们还写了一个JMTraceLogPrinter类，里面有一系列静态函数用于插入原程序中，输出相应信息。
 
 \section{代码插桩}
 Java字节码中对内存进行访问的指令有getstatic/putstatic/getfield/putfield/*aload/*astore。
 我们只需要考虑在遍历字节码时遇到这些指令的时候插入相应的输出代码即可。
 
 \subsection{涉及Field的内存访问操作}
-涉及到Field的内存访问操作有getstatic/putstatic/getfield/putfield。
-可以使用ASM包中MethodVisitor类里的void visitFieldInsn(int opcode, String owner, String name, String descriptor)在遍历到这些操作的时候进行插桩。
+涉及到类中Field的内存访问操作有getstatic/putstatic/getfield/putfield。
+可以改写ASM包中Method-Visitor类里的void visitFieldInsn(int opcode, String owner, String name, String descriptor)在遍历到这些操作的时候进行插桩。
 
 \subsubsection{getstatic/putstatic}
 因为getstatic和putstatic读写的是静态成员，所以我们直接通过MethodVisitor的visitLdcInsn将域的所有者owner和域名name压入栈中，
@@ -103,9 +103,35 @@ java字节中涉及数组的读写指令有*aload/*astore，分别用一个字�
 我们需要在visitInsn函数里对这一系列指令进行操作。
 
 \subsubsection{*aload}
-*aload
+*aload的一系列的操作时，栈顶为index，arrayref，因此我们只需要用DUP2指令将这个两个参数复制一份，然后插入调用输出函数的指令即可。
 
-\section{ACKNOWLEDGE}
+\subsubsection{*astore}
+*astore指令从栈顶开始依次摆放的是val, index, arrayref。我们想要获取的参数是index和arrayref，所以需要先将val交换下去。
+这时候会面临之前遇到的一个问题，就是需要单独考虑val是双字节类型如double、long的情况。这时需要插入DUP2\_X2等指令对栈进行操作，完成类似putfield中的双字节交换的效果。
+% \begin{lstlisting}[language=Java]
+%     if (Opcodes.IASTORE <= opcode && opcode <= Opcodes.SASTORE) {
+%         if (isDoubleByte(opcode)) {
+%             mv.visitInsn(Opcodes.DUP2_X2);
+%             mv.visitInsn(Opcodes.POP2);
+%         } else {
+%             mv.visitInsn(Opcodes.DUP_X2);
+%             mv.visitInsn(Opcodes.POP);
+%         }
+%         mv.visitInsn(Opcodes.DUP2);
+%         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "log/JMTraceLogPrinter", "arrayStoreLogPrint", "(Ljava/lang/Object;I)V", false);
+%         if (isDoubleByte(opcode)) {
+%             mv.visitInsn(Opcodes.DUP2_X2);
+%             mv.visitInsn(Opcodes.POP2);
+%         } else {
+%             mv.visitInsn(Opcodes.DUP2_X1);
+%             mv.visitInsn(Opcodes.POP2);
+%         }
+%     }
+% \end{lstlisting}
+
+
+\section{REFERENCE}
 https://docs.oracle.com/javase/specs/jvms/se11/html/jvms-6.html
+https://asm.ow2.io/
 
 \end{document}
